@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container">
+    <h1 class="text-center mb-4">Bulk Upload Reviews</h1>
+    <div class="card shadow">
+        <div class="card-body">
+            <form method="POST" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label for="file" class="form-label">Upload Excel File:</label>
+                    <input class="form-control" type="file" name="file" id="file" accept=".xlsx, .xls" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Upload and Analyze</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Visualization Section -->
+    {% if sentiment_data %}
+    <div class="mt-5">
+        <h2 class="text-center mb-4">Sentiment Analysis Results</h2>
+        <div class="row">
+            <!-- Pie Chart -->
+            <div class="col-md-6">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <canvas id="sentimentPieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <!-- Bar Chart -->
+            <div class="col-md-6">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <canvas id="sentimentBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <!-- Line Chart -->
+            <div class="col-md-6">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <canvas id="sentimentLineChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <!-- Word Cloud -->
+            <div class="col-md-6">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <div id="wordCloud"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Chart.js Script -->
+{% if sentiment_data %}
+<script>
+    // Data for charts
+    const sentimentData = {{ sentiment_data | tojson }};
+
+    // Pie Chart
+    const pieCtx = document.getElementById('sentimentPieChart').getContext('2d');
+    new Chart(pieCtx, {
+        type: 'pie',
+        data: {
+            labels: Object.keys(sentimentData),
+            datasets: [{
+                data: Object.values(sentimentData),
+                backgroundColor: ['#4CAF50', '#FFC107', '#F44336'],
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                title: {
+                    display: true,
+                    text: 'Sentiment Distribution'
+                }
+            }
+        }
+    });
+
+    // Bar Chart
+    const barCtx = document.getElementById('sentimentBarChart').getContext('2d');
+    new Chart(barCtx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(sentimentData),
+            datasets: [{
+                label: 'Number of Reviews',
+                data: Object.values(sentimentData),
+                backgroundColor: ['#4CAF50', '#FFC107', '#F44336'],
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false,
+                },
+                title: {
+                    display: true,
+                    text: 'Sentiment Analysis'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Line Chart
+    const lineCtx = document.getElementById('sentimentLineChart').getContext('2d');
+    new Chart(lineCtx, {
+        type: 'line',
+        data: {
+            labels: Object.keys(sentimentData),
+            datasets: [{
+                label: 'Sentiment Trend',
+                data: Object.values(sentimentData),
+                borderColor: '#4CAF50',
+                fill: false,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Sentiment Trend Over Time'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Word Cloud (using D3.js)
+    const words = [
+        { text: "love", size: 30 },
+        { text: "great", size: 25 },
+        { text: "bad", size: 20 },
+        { text: "excellent", size: 15 },
+        { text: "poor", size: 10 },
+    ];
+
+    const wordCloud = d3.select("#wordCloud")
+        .append("svg")
+        .attr("width", 500)
+        .attr("height", 300)
+        .append("g")
+        .attr("transform", "translate(250, 150)");
+
+    const cloud = d3.layout.cloud()
+        .size([500, 300])
+        .words(words)
+        .padding(5)
+        .rotate(() => (Math.random() - 0.5) * 60)
+        .fontSize(d => d.size)
+        .on("end", draw);
+
+    cloud.start();
+
+    function draw(words) {
+        wordCloud.selectAll("text")
+            .data(words)
+            .enter()
+            .append("text")
+            .style("font-size", d => `${d.size}px`)
+            .style("fill", "#4CAF50")
+            .attr("text-anchor", "middle")
+            .attr("transform", d => `translate(${d.x}, ${d.y})rotate(${d.rotate})`)
+            .text(d => d.text);
+    }
+</script>
+{% endif %}
+{% endblock %}

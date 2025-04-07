@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container">
+    <h1 class="text-center mb-4">Admin Dashboard</h1>
+
+    <!-- Visualization Section -->
+    <div class="row">
+        <!-- Pie Chart -->
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-body">
+                    <canvas id="sentimentPieChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <!-- Bar Chart -->
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-body">
+                    <canvas id="sentimentBarChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row mt-4">
+        <!-- Word Cloud -->
+        <div class="col-md-12">
+            <div class="card shadow">
+                <div class="card-body">
+                    <div id="wordCloud"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js Script -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- D3.js for Word Cloud -->
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+    // Data for charts
+    const sentimentData = {{ sentiment_data | tojson | safe }};
+    const wordFreq = {{ word_freq | tojson | safe }};
+
+    console.log("Sentiment Data:", sentimentData);
+    console.log("Word Frequency:", wordFreq);
+
+    // Pie Chart
+    const pieCtx = document.getElementById('sentimentPieChart').getContext('2d');
+    new Chart(pieCtx, {
+        type: 'pie',
+        data: {
+            labels: Object.keys(sentimentData),
+            datasets: [{
+                data: Object.values(sentimentData),
+                backgroundColor: ['#4CAF50', '#FFC107', '#F44336'],
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                title: {
+                    display: true,
+                    text: 'Sentiment Distribution'
+                }
+            }
+        }
+    });
+
+    // Bar Chart
+    const barCtx = document.getElementById('sentimentBarChart').getContext('2d');
+    new Chart(barCtx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(sentimentData),
+            datasets: [{
+                label: 'Number of Reviews',
+                data: Object.values(sentimentData),
+                backgroundColor: ['#4CAF50', '#FFC107', '#F44336'],
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false,
+                },
+                title: {
+                    display: true,
+                    text: 'Sentiment Analysis'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Word Cloud
+    const wordCloud = d3.select("#wordCloud")
+        .append("svg")
+        .attr("width", 800)  // Adjust width
+        .attr("height", 400)  // Adjust height
+        .append("g")
+        .attr("transform", "translate(400, 200)");  // Center the word cloud
+
+    const words = Object.entries(wordFreq).map(([text, size]) => ({ text, size }));
+
+    const cloud = d3.layout.cloud()
+        .size([800, 400])  // Match SVG size
+        .words(words)
+        .padding(5)
+        .rotate(() => (Math.random() - 0.5) * 60)  // Random rotation
+        .fontSize(d => d.size * 10)  // Scale word size
+        .on("end", draw);
+
+    cloud.start();
+
+    function draw(words) {
+        wordCloud.selectAll("text")
+            .data(words)
+            .enter()
+            .append("text")
+            .style("font-size", d => `${d.size}px`)
+            .style("fill", "#4CAF50")
+            .attr("text-anchor", "middle")
+            .attr("transform", d => `translate(${d.x}, ${d.y})rotate(${d.rotate})`)
+            .text(d => d.text);
+    }
+</script>
+{% endblock %}
