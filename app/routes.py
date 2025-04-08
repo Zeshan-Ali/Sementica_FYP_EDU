@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, abort, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from app import db, login_manager
 from app.models import User, Review
@@ -131,7 +131,6 @@ def analyze():
     return render_template('user_dashboard.html', 
                            sentiment=sentiment, 
                            reply=reply)
-
 @main.route('/bulk_upload', methods=['GET', 'POST'])
 @login_required
 def bulk_upload():
@@ -157,36 +156,36 @@ def bulk_upload():
                     flash('The file must contain a "review" column!', 'danger')
                     return redirect(request.url)
 
-                sentiment_counts = defaultdict(int)
+                # Store all reviews first (without analysis)
                 reviews = []
                 for review_text in df['review']:
-                    sentiment = analyze_sentiment(review_text)
-                    sentiment_counts[int(sentiment)] += 1
-                    reply = generate_ai_reply(review_text)
-                    review = Review(text=review_text, sentiment=sentiment, reply=reply, user_id=current_user.id)
+                    review = Review(text=review_text, 
+                                  sentiment=None,
+                                  reply=None,
+                                  user_id=current_user.id)
                     db.session.add(review)
                     reviews.append(review)
 
                 db.session.commit()
-                flash('Bulk upload successful!', 'success')
                 
-                # Get the newly added reviews
-                new_reviews = Review.query.filter_by(user_id=current_user.id)\
-                                       .order_by(Review.id.desc())\
-                                       .limit(len(df))\
-                                       .all()
+                # Check if "analyze_all" parameter was sent
+                if request.form.get('analyze_all') == 'true':
+                    # Analyze all reviews in bulk
+                    for review in reviews:
+                        review.sentiment = analyze_sentiment(review.text)
+                        review.reply = generate_ai_reply(review.text)
+                    db.session.commit()
+                    flash('Bulk upload and analysis completed!', 'success')
+                else:
+                    flash('Reviews uploaded successfully! You can analyze them individually or all at once.', 'success')
                 
                 return render_template('bulk_upload.html', 
-                                       sentiment_data=dict(sentiment_counts),
-                                       uploaded_reviews=new_reviews)
+                                    uploaded_reviews=reviews,
+                                    analyzed_all=request.form.get('analyze_all') == 'true')
 
             except Exception as e:
                 flash(f'Error processing file: {str(e)}', 'danger')
                 return redirect(request.url)
-
-        else:
-            flash('Invalid file type! Only Excel files are allowed.', 'danger')
-            return redirect(request.url)
 
     return render_template('bulk_upload.html')
 

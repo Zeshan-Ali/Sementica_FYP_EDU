@@ -10,8 +10,6 @@ class User(db.Model, UserMixin):
 class Review(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     text = db.Column(db.String(500), nullable=False)
-    sentiment = db.Column(db.String(20), nullable=False)
+    sentiment = db.Column(db.String(20), nullable=True)
     reply = db.Column(db.String(500), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    # In models.py - ensure Review model has reply field
-    reply = db.Column(db.String(500), nullable=True)  # Ensure this exists
