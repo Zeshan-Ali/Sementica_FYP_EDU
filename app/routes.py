@@ -37,7 +37,10 @@ def analyze_sentiment(text):
     
     # Convert numerical prediction to text labels
     return "positive" if prediction == 1 else "negative"  # Or add "neutral" if you have 3 classes
-
+@main.route('/')
+def index():
+    """Show login page at root URL"""
+    return render_template('login.html')  
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
