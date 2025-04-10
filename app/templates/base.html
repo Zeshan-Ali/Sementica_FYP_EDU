@@ -27,6 +27,19 @@
         .generate-single {
             margin-right: 10px;
         }
+        .product-card {
+    transition: transform 0.3s ease;    
+        }
+    .product-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+    .review-card {
+        border-left: 4px solid #dee2e6;
+        }
+    .review-card:hover {
+        border-left-color: #0d6efd;
+        }
     </style>
 </head>
 <body>
@@ -44,6 +57,9 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('main.bulk_upload') }}">Bulk Upload</a>
+                    </li>
+                    <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.products') }}">Products</a>
                     </li>
                 </ul>
                 <ul class="navbar-nav ms-auto">

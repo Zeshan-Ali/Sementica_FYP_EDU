@@ -118,8 +118,6 @@ def user_dashboard():
 def analyze():
     text = request.form.get('review')
     sentiment = analyze_sentiment(text)
-    
-    # Use AI to generate reply based on sentiment
     reply = generate_ai_reply(text)
     
     review = Review(
@@ -131,9 +129,15 @@ def analyze():
     db.session.add(review)
     db.session.commit()
     
-    return render_template('user_dashboard.html', 
+    # Check where the request came from
+    if request.referrer and 'products' in request.referrer:
+        return redirect(url_for('main.products'))
+    else:
+        return render_template('user_dashboard.html', 
                            sentiment=sentiment, 
                            reply=reply)
+    
+
 @main.route('/bulk_upload', methods=['GET', 'POST'])
 @login_required
 def bulk_upload():
@@ -228,3 +232,18 @@ def bulk_generate_replies():
     
     threading.Thread(target=background_task).start()
     return jsonify({'status': 'started'})
+
+
+@main.route('/products')
+def products():
+    # Get sample reviews for demonstration
+    # In a real app, you'd want to filter by product ID or category
+    reviews = Review.query.order_by(Review.id.desc()).limit(10).all()
+    
+    # Split into two groups for demonstration (phone and laptop reviews)
+    reviews_phone = [r for r in reviews if 'phone' in r.text.lower()]
+    reviews_laptop = [r for r in reviews if 'laptop' in r.text.lower()]
+    
+    return render_template('products.html',
+                         reviews_phone=reviews_phone,
+                         reviews_laptop=reviews_laptop)
