@@ -4,59 +4,106 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;600&display=swap" rel="stylesheet">
     <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
+            font-family: 'Poppins', sans-serif;
+            background: url('https://images.unsplash.com/photo-1562562638-93d9bff68913?crop=entropy&cs=tinysrgb&fit=max&ixid=MXwyMDg5MnwwfDF8c2VhcmNofDIyfHxibHVlJTIwYWN0aW9uc3xlbnwwfDB8fA&ixlib=rb-1.2.1&q=80&w=1080') no-repeat center center fixed;
+            background-size: cover;
+            height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
+            padding: 0 15px;
         }
+
         .register-container {
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            width: 300px;
-        }
-        .register-container h2 {
-            margin-bottom: 20px;
+            background-color: rgba(255, 255, 255, 0.85);
+            padding: 40px 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 400px;
             text-align: center;
         }
-        .register-container input, .register-container select {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+
+        .register-container h2 {
+            margin-bottom: 30px;
+            font-weight: 600;
+            color: #333;
+            font-size: 24px;
         }
+
+        .register-container input,
+        .register-container select {
+            width: 100%;
+            padding: 14px 12px;
+            margin-bottom: 18px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            color: #333;
+            background-color: #fafafa;
+            transition: all 0.3s ease;
+        }
+
+        .register-container input:focus,
+        .register-container select:focus {
+            border-color: #007bff;
+            outline: none;
+            background-color: #ffffff;
+        }
+
         .register-container button {
             width: 100%;
-            padding: 10px;
-            background-color: #28a745;
-            color: #fff;
+            padding: 14px;
+            background-color: #007bff;
+            color: white;
+            font-size: 18px;
             border: none;
-            border-radius: 4px;
+            border-radius: 8px;
             cursor: pointer;
+            transition: background 0.3s ease;
         }
+
         .register-container button:hover {
-            background-color: #218838;
+            background-color: #0056b3;
         }
-        .flash-messages {
+
+        .flash-messages .message {
+            color: #e63946;
+            font-size: 16px;
             margin-bottom: 15px;
         }
-        .flash-messages .message {
-            color: red;
-            text-align: center;
+
+        .register-container p {
+            font-size: 16px;
+            margin-top: 15px;
+        }
+
+        .register-container a {
+            color: #007bff;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .register-container a:hover {
+            color: #0056b3;
+            text-decoration: underline;
         }
     </style>
 </head>
 <body>
     <div class="register-container">
-        <h2>Register</h2>
-        <!-- Flash messages for errors -->
+        <h2>Create Your Account</h2>
+
+        <!-- Flash Messages -->
         <div class="flash-messages">
             {% with messages = get_flashed_messages() %}
                 {% if messages %}
@@ -66,20 +113,17 @@
                 {% endif %}
             {% endwith %}
         </div>
-        <!-- Registration form -->
+
+        <!-- Registration Form -->
+        <!-- Remove the role selection dropdown completely -->
         <form method="POST" action="{{ url_for('main.register') }}">
             <input type="text" name="username" placeholder="Username" required>
             <input type="password" name="password" placeholder="Password" required>
-            <select name="role" required>
-                <option value="" disabled selected>Select Role</option>
-                <option value="admin">Admin</option>
-                <option value="user">User</option>
-            </select>
+            <input type="hidden" name="role" value="user"> <!-- Force user role -->
             <button type="submit">Register</button>
         </form>
-        <p style="text-align: center; margin-top: 10px;">
-            Already have an account? <a href="{{ url_for('main.login') }}">Login</a>
-        </p>
+
+        <p>Already have an account? <a href="{{ url_for('main.login') }}">Login here</a></p>
     </div>
 </body>
 </html>

@@ -1,152 +1,208 @@
 {% extends 'base.html' %}
 {% block content %}
-<h1>Bulk Review Upload</h1>
 
-<form method="POST" enctype="multipart/form-data" id="uploadForm">
-    <div class="mb-3">
-        <input type="file" class="form-control" name="file" accept=".xlsx,.xls" required>
-    </div>
-    <div class="mb-3">
-        <button type="submit" class="btn btn-success" name="analyze_all" value="true">
-            Upload & Analyze All
-        </button>
-    </div>
-</form>
+<style>
+  body {
+    background: url('https://images.unsplash.com/photo-1503264116251-35a269479413?auto=format&fit=crop&w=1400&q=80') no-repeat center center fixed;
+    background-size: cover;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+  }
 
-{% if uploaded_reviews %}
-<hr>
-<div class="d-flex justify-content-between align-items-center mb-3">
+  .content-wrapper {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-radius: 20px;
+    padding: 40px 30px;
+    margin: 60px auto;
+    max-width: 900px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.2);
+    animation: fadeIn 0.9s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(25px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  h1, h3 {
+    color: #fff;
+    text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.6);
+  }
+
+  .form-control, .btn {
+    border-radius: 12px;
+  }
+
+  .btn-success {
+    background-color: #28a745;
+    border: none;
+    transition: background-color 0.3s ease;
+  }
+
+  .btn-success:hover {
+    background-color: #218838;
+  }
+
+  .card {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 16px;
+    margin-bottom: 20px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  .card-title, .card-text, .alert-info, .badge {
+    color: #fff;
+  }
+
+  .alert-info {
+    background-color: rgba(23, 162, 184, 0.25);
+    border: none;
+  }
+
+  .copy-btn {
+    margin-top: 10px;
+  }
+</style>
+
+<div class="content-wrapper">
+  <h1 class="mb-4 text-center">📤 Bulk Review Upload</h1>
+
+  <form method="POST" enctype="multipart/form-data" id="uploadForm">
+    <div class="mb-4">
+      <input type="file" class="form-control" name="file" accept=".xlsx,.xls" required>
+    </div>
+    <div class="text-center">
+      <button type="submit" class="btn btn-success px-4 py-2" name="analyze_all" value="true">
+        Upload & Analyze All
+      </button>
+    </div>
+  </form>
+
+  {% if uploaded_reviews %}
+  <hr>
+  <div class="d-flex justify-content-between align-items-center mb-4">
     <h3>Uploaded Reviews</h3>
     {% if not analyzed_all %}
     <button id="analyzeAllBtn" class="btn btn-success">
-        <i class="bi bi-magic"></i> Analyze All Now
+      <i class="bi bi-magic"></i> Analyze All Now
     </button>
     {% endif %}
-</div>
+  </div>
 
-<div class="mt-4">
+  <div>
     {% for review in uploaded_reviews %}
-    <div class="card mb-3">
-        <div class="card-body">
-            <h5 class="card-title">Review #{{ loop.index }}</h5>
-            <p class="card-text">{{ review.text }}</p>
-            
-            <div id="review-{{ review.id }}-result">
-                {% if review.sentiment %}
-                <p><strong>Sentiment:</strong> 
-                    <span class="badge 
-                        {% if review.sentiment == 'positive' %}bg-success
-                        {% elif review.sentiment == 'negative' %}bg-danger
-                        {% else %}bg-warning text-dark{% endif %}">
-                        {{ review.sentiment }}
-                    </span>
-                </p>
-                <div class="alert alert-info">
-                    <strong>AI Reply:</strong> 
-                    <p>{{ review.reply }}</p>
-                    <button class="btn btn-sm btn-outline-secondary copy-btn" 
-                            data-text="{{ review.reply }}">
-                        <i class="bi bi-clipboard"></i> Copy
-                    </button>
-                </div>
-                {% else %}
-                <button class="btn btn-sm btn-primary analyze-btn" 
-                        data-review-id="{{ review.id }}">
-                    Analyze This Review
-                </button>
-                {% endif %}
-            </div>
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Review #{{ loop.index }}</h5>
+        <p class="card-text">{{ review.text }}</p>
+
+        <div id="review-{{ review.id }}-result">
+          {% if review.sentiment %}
+          <p><strong>Sentiment:</strong>
+            <span class="badge 
+              {% if review.sentiment == 'positive' %}bg-success
+              {% elif review.sentiment == 'negative' %}bg-danger
+              {% else %}bg-warning text-dark{% endif %}">
+              {{ review.sentiment }}
+            </span>
+          </p>
+          <div class="alert alert-info">
+            <strong>AI Reply:</strong>
+            <p>{{ review.reply }}</p>
+            <button class="btn btn-sm btn-outline-light copy-btn" data-text="{{ review.reply }}">
+              <i class="bi bi-clipboard"></i> Copy
+            </button>
+          </div>
+          {% else %}
+          <button class="btn btn-sm btn-primary analyze-btn" data-review-id="{{ review.id }}">
+            Analyze This Review
+          </button>
+          {% endif %}
         </div>
+      </div>
     </div>
     {% endfor %}
+  </div>
+  {% endif %}
 </div>
-{% endif %}
 
 <script>
-$(document).ready(function() {
-    // Analyze single review
-    $('.analyze-btn').click(function() {
-        const reviewId = $(this).data('review-id');
-        const btn = $(this);
-        
-        btn.html('<span class="spinner-border spinner-border-sm"></span> Analyzing...');
-        btn.prop('disabled', true);
-        
-        $.post(`/analyze_review/${reviewId}`, function(data) {
-            $('#review-' + reviewId + '-result').html(`
-                <p><strong>Sentiment:</strong> 
-                    <span class="badge ${data.sentiment === 'positive' ? 'bg-success' : 
-                                      data.sentiment === 'negative' ? 'bg-danger' : 'bg-warning text-dark'}">
-                        ${data.sentiment}
-                    </span>
-                </p>
-                <div class="alert alert-info">
-                    <strong>AI Reply:</strong> 
-                    <p>${data.reply}</p>
-                    <button class="btn btn-sm btn-outline-secondary copy-btn" 
-                            data-text="${data.reply}">
-                        <i class="bi bi-clipboard"></i> Copy
-                    </button>
-                </div>
-            `);
-            bindCopyButtons();
-        }).fail(function() {
-            btn.html('Analyze This Review').prop('disabled', false);
-            alert('Error analyzing review');
-        });
-    });
-
-    // Analyze all reviews
-    $('#analyzeAllBtn').click(function() {
-        const btn = $(this);
-        btn.html('<span class="spinner-border spinner-border-sm"></span> Analyzing All...');
-        btn.prop('disabled', true);
-        
-        // Get all unanalyzed review IDs
-        const reviewIds = [];
-        $('.analyze-btn').each(function() {
-            reviewIds.push($(this).data('review-id'));
-        });
-        
-        if (reviewIds.length === 0) {
-            alert('No reviews need analysis');
-            btn.html('Analyze All Now').prop('disabled', false);
-            return;
-        }
-        
-        // Start bulk analysis
-        $.post('/bulk_generate_replies', {
-            review_ids: reviewIds
-        }, function(response) {
-            if (response.status === 'started') {
-                // Poll for completion
-                const pollInterval = setInterval(function() {
-                    $.get('/get_reviews?ids=' + reviewIds.join(','), function(data) {
-                        if (data.every(item => item.reply)) {
-                            clearInterval(pollInterval);
-                            location.reload(); // Refresh to show all results
-                        }
-                    });
-                }, 2000);
-            }
-        }).fail(function() {
-            btn.html('Analyze All Now').prop('disabled', false);
-            alert('Error starting bulk analysis');
-        });
-    });
-
-    // Copy button functionality
+  $(document).ready(function () {
     function bindCopyButtons() {
-        $('.copy-btn').click(function() {
-            const text = $(this).data('text');
-            navigator.clipboard.writeText(text).then(() => {
-                const originalHtml = $(this).html();
-                $(this).html('<i class="bi bi-check"></i> Copied!');
-                setTimeout(() => $(this).html(originalHtml), 2000);
-            });
+      $('.copy-btn').click(function () {
+        const text = $(this).data('text');
+        navigator.clipboard.writeText(text).then(() => {
+          const originalHtml = $(this).html();
+          $(this).html('<i class="bi bi-check"></i> Copied!');
+          setTimeout(() => $(this).html(originalHtml), 2000);
         });
+      });
     }
+
+    $('.analyze-btn').click(function () {
+      const reviewId = $(this).data('review-id');
+      const btn = $(this);
+      btn.html('<span class="spinner-border spinner-border-sm"></span> Analyzing...');
+      btn.prop('disabled', true);
+      $.post(`/analyze_review/${reviewId}`, function (data) {
+        $(`#review-${reviewId}-result`).html(`
+          <p><strong>Sentiment:</strong>
+            <span class="badge ${data.sentiment === 'positive' ? 'bg-success' : data.sentiment === 'negative' ? 'bg-danger' : 'bg-warning text-dark'}">
+              ${data.sentiment}
+            </span>
+          </p>
+          <div class="alert alert-info">
+            <strong>AI Reply:</strong>
+            <p>${data.reply}</p>
+            <button class="btn btn-sm btn-outline-light copy-btn" data-text="${data.reply}">
+              <i class="bi bi-clipboard"></i> Copy
+            </button>
+          </div>
+        `);
+        bindCopyButtons();
+      }).fail(function () {
+        btn.html('Analyze This Review').prop('disabled', false);
+        alert('Error analyzing review');
+      });
+    });
+
+    $('#analyzeAllBtn').click(function () {
+      const btn = $(this);
+      btn.html('<span class="spinner-border spinner-border-sm"></span> Analyzing All...');
+      btn.prop('disabled', true);
+      const reviewIds = $('.analyze-btn').map(function () {
+        return $(this).data('review-id');
+      }).get();
+
+      if (reviewIds.length === 0) {
+        alert('No reviews need analysis');
+        btn.html('Analyze All Now').prop('disabled', false);
+        return;
+      }
+
+      $.post('/bulk_generate_replies', { review_ids: reviewIds }, function (response) {
+        if (response.status === 'started') {
+          const pollInterval = setInterval(function () {
+            $.get('/get_reviews?ids=' + reviewIds.join(','), function (data) {
+              if (data.every(item => item.reply)) {
+                clearInterval(pollInterval);
+                location.reload();
+              }
+            });
+          }, 2000);
+        }
+      }).fail(function () {
+        btn.html('Analyze All Now').prop('disabled', false);
+        alert('Error starting bulk analysis');
+      });
+    });
+
     bindCopyButtons();
-});
+  });
 </script>
+
 {% endblock %}

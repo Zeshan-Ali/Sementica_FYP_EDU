@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">Our Products</h1>
+    
+    <!-- Product 1 -->
+    <div class="card mb-5">
+        <div class="row g-0">
+            <div class="col-md-4">
+                <img src="/static/images/mobile.jpeg" class="img-fluid rounded-start" alt="Smartphone">
+            </div>
+            <div class="col-md-8">
+                <div class="card-body">
+                    <h2 class="card-title">Premium Smartphone</h2>
+                    <p class="card-text">Latest model with advanced camera and 5G connectivity.</p>
+                    <p class="text-success h4">$799.99</p>
+                    
+                    <div class="mt-4">
+                        <h3>Customer Reviews</h3>
+                        
+                        <!-- Review Form -->
+                        {% if current_user.is_authenticated %}
+                        <form method="POST" action="{{ url_for('main.analyze') }}" class="mb-4">
+                            <input type="hidden" name="redirect_to" value="products">
+                            <div class="mb-3">
+                                <textarea class="form-control" name="review" rows="3" placeholder="Write your review..." required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Submit Review</button>
+                        </form>
+                        {% else %}
+                        <p class="text-muted">Please <a href="{{ url_for('main.login') }}">login</a> to leave a review.</p>
+                        {% endif %}
+                        
+                        <!-- Reviews List -->
+                        <div class="reviews-container">
+                            {% for review in reviews_phone %}
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h5>User {{ review.user_id }}</h5>
+                                    <p class="card-text">{{ review.text }}</p>
+                                    
+                                    {% if review.reply %}
+                                    <div class="alert alert-info mt-2">
+                                        <strong>Our Response:</strong> 
+                                        <p>{{ review.reply }}</p>
+                                    </div>
+                                    {% elif current_user.is_authenticated and current_user.role == 'admin' %}
+                                    <button class="btn btn-sm btn-primary analyze-btn" 
+                                            data-review-id="{{ review.id }}">
+                                        Generate Response
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Product 2 -->
+    <div class="card mb-5">
+        <div class="row g-0">
+            <div class="col-md-4">
+                <img src="/static/images/laptop.jpeg" class="img-fluid rounded-start" alt="Laptop">
+            </div>
+            <div class="col-md-8">
+                <div class="card-body">
+                    <h2 class="card-title">Ultrabook Laptop</h2>
+                    <p class="card-text">Lightweight and powerful with 12-hour battery life.</p>
+                    <p class="text-success h4">$1299.99</p>
+                    
+                    <div class="mt-4">
+                        <h3>Customer Reviews</h3>
+                        
+                        <!-- Review Form -->
+                        {% if current_user.is_authenticated %}
+                        <form method="POST" action="{{ url_for('main.analyze') }}" class="mb-4">
+                            <input type="hidden" name="redirect_to" value="products">
+                            <div class="mb-3">
+                                <textarea class="form-control" name="review" rows="3" placeholder="Write your review..." required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Submit Review</button>
+                        </form>
+                        {% else %}
+                        <p class="text-muted">Please <a href="{{ url_for('main.login') }}">login</a> to leave a review.</p>
+                        {% endif %}
+                        
+                        <!-- Reviews List -->
+                        <div class="reviews-container">
+                            {% for review in reviews_laptop %}
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h5>User {{ review.user_id }}</h5>
+                                    <p class="card-text">{{ review.text }}</p>
+                                    
+                                    {% if review.reply %}
+                                    <div class="alert alert-info mt-2">
+                                        <strong>Our Response:</strong> 
+                                        <p>{{ review.reply }}</p>
+                                    </div>
+                                    {% elif current_user.is_authenticated and current_user.role == 'admin' %}
+                                    <button class="btn btn-sm btn-primary analyze-btn" 
+                                            data-review-id="{{ review.id }}">
+                                        Generate Response
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // Analyze button click handler
+    $('.analyze-btn').click(function() {
+        const reviewId = $(this).data('review-id');
+        const btn = $(this);
+        const cardBody = $(this).closest('.card-body');
+        
+        btn.html('<span class="spinner-border spinner-border-sm"></span> Generating...');
+        btn.prop('disabled', true);
+        
+        $.post(`/generate_reply`, {
+            review: cardBody.find('.card-text').text()
+        }, function(data) {
+            if (data.reply) {
+                cardBody.append(`
+                    <div class="alert alert-info mt-2">
+                        <strong>Our Response:</strong> 
+                        <p>${data.reply}</p>
+                    </div>
+                `);
+                btn.remove();
+                
+                // Save to database
+                $.post(`/analyze_review/${reviewId}`, function() {
+                    // Success
+                });
+            } else {
+                alert('Error generating reply');
+                btn.html('Generate Response').prop('disabled', false);
+            }
+        }).fail(function() {
+            btn.html('Generate Response').prop('disabled', false);
+            alert('Error generating reply');
+        });
+    });
+});
+</script>
+{% endblock %}
