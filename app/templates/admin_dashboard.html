@@ -1,31 +1,9 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="container">
-    <!-- Super Admin Controls -->
-    {% if current_user.role == 'superadmin' %}
-    <div class="card shadow mb-4">
-        <div class="card-header bg-danger text-white">
-            <h3><i class="bi bi-shield-lock"></i> Super Admin Panel</h3>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-4 mb-3">
-                    <a href="{{ url_for('main.create_admin') }}" class="btn btn-success w-100">
-                        <i class="bi bi-person-plus"></i> Create Admin
-                    </a>
-                </div>
-                <div class="col-md-4 mb-3">
-                    <button class="btn btn-info w-100" data-bs-toggle="modal" data-bs-target="#adminListModal">
-                        <i class="bi bi-people-fill"></i> Manage Admins
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
+    <h1 class="text-center mb-4">Admin Dashboard</h1>
 
     <!-- Visualization Section -->
-    {% if sentiment_data %}
     <div class="row">
         <!-- Pie Chart -->
         <div class="col-md-6">
@@ -44,9 +22,8 @@
             </div>
         </div>
     </div>
-    
-    <!-- Word Cloud -->
     <div class="row mt-4">
+        <!-- Word Cloud -->
         <div class="col-md-12">
             <div class="card shadow">
                 <div class="card-body">
@@ -55,82 +32,37 @@
             </div>
         </div>
     </div>
-    {% else %}
-    <div class="alert alert-info">
-        No review data available for visualization.
-    </div>
-    {% endif %}
 </div>
 
-<!-- Admin List Modal -->
-<div class="modal fade" id="adminListModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-people-fill"></i> Admin Management</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <table class="table table-striped table-hover">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>ID</th>
-                            <th>Username</th>
-                            <th>Role</th>
-                            <th>Created By</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for admin in admins %}
-                        <tr>
-                            <td>{{ admin.id }}</td>
-                            <td>{{ admin.username }}</td>
-                            <td><span class="badge bg-{{ 'danger' if admin.role == 'superadmin' else 'primary' }}">
-                                {{ admin.role }}
-                            </span></td>
-                            <td>
-                                {% if admin.created_by == 0 %}System
-                                {% else %}User #{{ admin.created_by }}
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if admin.id != current_user.id and admin.role != 'superadmin' %}
-                                <button class="btn btn-sm btn-danger revoke-admin" data-admin-id="{{ admin.id }}">
-                                    <i class="bi bi-person-x"></i> Revoke
-                                </button>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Add Bootstrap Icons -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
-
+<!-- Chart.js Script -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- D3.js for Word Cloud -->
+<script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
-$(document).ready(function() {
-    // Initialize Charts only if data exists
-    {% if sentiment_data %}
+    // Data for charts
+    const sentimentData = {{ sentiment_data | tojson | safe }};
+    const wordFreq = {{ word_freq | tojson | safe }};
+
+    console.log("Sentiment Data:", sentimentData);
+    console.log("Word Frequency:", wordFreq);
+
     // Pie Chart
     const pieCtx = document.getElementById('sentimentPieChart').getContext('2d');
     new Chart(pieCtx, {
         type: 'pie',
         data: {
-            labels: {{ sentiment_data.keys()|list|tojson }},
+            labels: Object.keys(sentimentData),
             datasets: [{
-                data: {{ sentiment_data.values()|list }},
+                data: Object.values(sentimentData),
                 backgroundColor: ['#4CAF50', '#FFC107', '#F44336'],
             }]
         },
         options: {
             responsive: true,
             plugins: {
+                legend: {
+                    position: 'top',
+                },
                 title: {
                     display: true,
                     text: 'Sentiment Distribution'
@@ -144,16 +76,19 @@ $(document).ready(function() {
     new Chart(barCtx, {
         type: 'bar',
         data: {
-            labels: {{ sentiment_data.keys()|list|tojson }},
+            labels: Object.keys(sentimentData),
             datasets: [{
                 label: 'Number of Reviews',
-                data: {{ sentiment_data.values()|list }},
+                data: Object.values(sentimentData),
                 backgroundColor: ['#4CAF50', '#FFC107', '#F44336'],
             }]
         },
         options: {
             responsive: true,
             plugins: {
+                legend: {
+                    display: false,
+                },
                 title: {
                     display: true,
                     text: 'Sentiment Analysis'
@@ -170,19 +105,19 @@ $(document).ready(function() {
     // Word Cloud
     const wordCloud = d3.select("#wordCloud")
         .append("svg")
-        .attr("width", 800)
-        .attr("height", 400)
+        .attr("width", 800)  // Adjust width
+        .attr("height", 400)  // Adjust height
         .append("g")
-        .attr("transform", "translate(400, 200)");
+        .attr("transform", "translate(400, 200)");  // Center the word cloud
 
-    const words = Object.entries({{ word_freq|tojson }}).map(([text, size]) => ({ text, size }));
+    const words = Object.entries(wordFreq).map(([text, size]) => ({ text, size }));
 
     const cloud = d3.layout.cloud()
-        .size([800, 400])
+        .size([800, 400])  // Match SVG size
         .words(words)
         .padding(5)
-        .rotate(() => (Math.random() - 0.5) * 60)
-        .fontSize(d => d.size * 10)
+        .rotate(() => (Math.random() - 0.5) * 60)  // Random rotation
+        .fontSize(d => d.size * 10)  // Scale word size
         .on("end", draw);
 
     cloud.start();
@@ -198,24 +133,5 @@ $(document).ready(function() {
             .attr("transform", d => `translate(${d.x}, ${d.y})rotate(${d.rotate})`)
             .text(d => d.text);
     }
-    {% endif %}
-
-    // Revoke Admin Action
-    $('.revoke-admin').click(function() {
-        const adminId = $(this).data('admin-id');
-        if (confirm('Revoke admin privileges for this user?')) {
-            fetch('/revoke-admin', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ admin_id: adminId })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) location.reload();
-                else alert('Error: ' + data.message);
-            });
-        }
-    });
-});
 </script>
 {% endblock %}
