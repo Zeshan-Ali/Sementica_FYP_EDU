@@ -2,136 +2,237 @@
 {% block content %}
 <div class="container">
     <h1 class="text-center mb-4">Admin Dashboard</h1>
+    <div class="container">
+        <!-- Super Admin Controls -->
+        {% if current_user.role == 'superadmin' %}
+        <div class="card shadow mb-4">
+            <div class="card-header bg-danger text-white">
+                <h3><i class="bi bi-shield-lock"></i> Super Admin Panel</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <a href="{{ url_for('main.create_admin') }}" class="btn btn-success w-100">
+                            <i class="bi bi-person-plus"></i> Create Admin
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <button class="btn btn-info w-100" data-bs-toggle="modal" data-bs-target="#adminListModal">
+                            <i class="bi bi-people-fill"></i> Manage Admins
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    
+<!-- admin_dashboard.html -->
+<!-- Add this after Super Admin Controls -->
+<ul class="nav nav-tabs mb-3" id="productTabs">
+    <li class="nav-item">
+        <a class="nav-link active" data-bs-toggle="tab" href="#all">All Products</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#mobile">Mobile</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#laptop">Laptop</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#general">General</a>
+    </li>
+</ul>
 
-    <!-- Visualization Section -->
-    <div class="row">
-        <!-- Pie Chart -->
-        <div class="col-md-6">
-            <div class="card shadow">
-                <div class="card-body">
-                    <canvas id="sentimentPieChart"></canvas>
+<div class="tab-content">
+    {% for category in ['all', 'mobile', 'laptop', 'general'] %}
+    <div class="tab-pane {% if category == 'all' %}active{% endif %}" id="{{ category }}">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <canvas id="pieChart-{{ category }}"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <canvas id="barChart-{{ category }}"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
-        <!-- Bar Chart -->
-        <div class="col-md-6">
-            <div class="card shadow">
-                <div class="card-body">
-                    <canvas id="sentimentBarChart"></canvas>
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <div id="wordcloud-{{ category }}"></div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="row mt-4">
-        <!-- Word Cloud -->
-        <div class="col-md-12">
-            <div class="card shadow">
-                <div class="card-body">
-                    <div id="wordCloud"></div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% endfor %}
 </div>
-
 <!-- Chart.js Script -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <!-- D3.js for Word Cloud -->
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
-    // Data for charts
     const sentimentData = {{ sentiment_data | tojson | safe }};
     const wordFreq = {{ word_freq | tojson | safe }};
 
-    console.log("Sentiment Data:", sentimentData);
-    console.log("Word Frequency:", wordFreq);
-
-    // Pie Chart
-    const pieCtx = document.getElementById('sentimentPieChart').getContext('2d');
-    new Chart(pieCtx, {
-        type: 'pie',
-        data: {
-            labels: Object.keys(sentimentData),
-            datasets: [{
-                data: Object.values(sentimentData),
-                backgroundColor: ['#4CAF50', '#FFC107', '#F44336'],
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'top',
+    // Initialize charts for each category
+    ['all', 'mobile', 'laptop', 'general'].forEach(category => {
+        const dataExists = Object.keys(sentimentData[category]).length > 0;
+        
+        // Pie Chart
+        if (dataExists) {
+            new Chart(document.getElementById(`pieChart-${category}`).getContext('2d'), {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(sentimentData[category]),
+                    datasets: [{
+                        data: Object.values(sentimentData[category]),
+                        backgroundColor: ['#4CAF50', '#FFC107', '#F44336']
+                    }]
                 },
-                title: {
-                    display: true,
-                    text: 'Sentiment Distribution'
+                options: {
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${category.toUpperCase()} Sentiment Distribution`
+                        }
+                    }
                 }
+            });
+        }
+
+        // Bar Chart
+        if (dataExists) {
+            new Chart(document.getElementById(`barChart-${category}`).getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(sentimentData[category]),
+                    datasets: [{
+                        label: 'Reviews Count',
+                        data: Object.values(sentimentData[category]),
+                        backgroundColor: ['#4CAF50', '#FFC107', '#F44336']
+                    }]
+                },
+                options: {
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${category.toUpperCase()} Sentiment Analysis`
+                        }
+                    },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        // Word Cloud
+        const words = Object.entries(wordFreq[category]).map(([text, size]) => ({text, size}));
+        if (words.length > 0) {
+            const cloud = d3.layout.cloud()
+                .size([800, 400])
+                .words(words)
+                .padding(10)
+                .rotate(() => Math.random() * 90 - 45)
+                .fontSize(d => d.size * 15)
+                .on("end", draw);
+            
+            cloud.start();
+
+            function draw(words) {
+                d3.select(`#wordcloud-${category}`)
+                    .append("svg")
+                    .attr("width", 800)
+                    .attr("height", 400)
+                    .append("g")
+                    .attr("transform", "translate(400,200)")
+                    .selectAll("text")
+                    .data(words)
+                    .enter().append("text")
+                    .style("font-size", d => `${d.size}px`)
+                    .style("fill", "#4CAF50")
+                    .attr("transform", d => `translate(${[d.x, d.y]})rotate(${d.rotate})`)
+                    .text(d => d.text);
             }
         }
     });
+    
+</script>
+<!-- Admin List Modal -->
+<div class="modal fade" id="adminListModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-people-fill"></i> Manage Admins</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Role</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for admin in admins %}
+                            <tr>
+                                <td>{{ admin.username }}</td>
+                                <td>{{ admin.role }}</td>
+                                <td>
+                                    {% if admin.id != current_user.id and admin.role != 'superadmin' %}
+                                    <button class="btn btn-danger btn-sm revoke-admin" 
+                                            data-admin-id="{{ admin.id }}">
+                                        <i class="bi bi-person-dash"></i> Revoke
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    // ... (all your existing chart visualization code) ...
 
-    // Bar Chart
-    const barCtx = document.getElementById('sentimentBarChart').getContext('2d');
-    new Chart(barCtx, {
-        type: 'bar',
-        data: {
-            labels: Object.keys(sentimentData),
-            datasets: [{
-                label: 'Number of Reviews',
-                data: Object.values(sentimentData),
-                backgroundColor: ['#4CAF50', '#FFC107', '#F44336'],
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    display: false,
-                },
-                title: {
-                    display: true,
-                    text: 'Sentiment Analysis'
+    // Revoke Admin Action
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.revoke-admin').forEach(button => {
+            button.addEventListener('click', function() {
+                const adminId = this.dataset.adminId;
+                if (confirm('Are you sure you want to revoke admin privileges for this user?')) {
+                    fetch('/revoke-admin', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ admin_id: adminId })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            location.reload();
+                        } else {
+                            alert('Error: ' + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('An error occurred while revoking admin privileges');
+                    });
                 }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
-            }
-        }
+            });
+        });
     });
-
-    // Word Cloud
-    const wordCloud = d3.select("#wordCloud")
-        .append("svg")
-        .attr("width", 800)  // Adjust width
-        .attr("height", 400)  // Adjust height
-        .append("g")
-        .attr("transform", "translate(400, 200)");  // Center the word cloud
-
-    const words = Object.entries(wordFreq).map(([text, size]) => ({ text, size }));
-
-    const cloud = d3.layout.cloud()
-        .size([800, 400])  // Match SVG size
-        .words(words)
-        .padding(5)
-        .rotate(() => (Math.random() - 0.5) * 60)  // Random rotation
-        .fontSize(d => d.size * 10)  // Scale word size
-        .on("end", draw);
-
-    cloud.start();
-
-    function draw(words) {
-        wordCloud.selectAll("text")
-            .data(words)
-            .enter()
-            .append("text")
-            .style("font-size", d => `${d.size}px`)
-            .style("fill", "#4CAF50")
-            .attr("text-anchor", "middle")
-            .attr("transform", d => `translate(${d.x}, ${d.y})rotate(${d.rotate})`)
-            .text(d => d.text);
-    }
 </script>
 {% endblock %}

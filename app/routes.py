@@ -222,10 +222,11 @@ def products():
     # Get sample reviews for demonstration
     # In a real app, you'd want to filter by product ID or category
     reviews = Review.query.order_by(Review.id.desc()).limit(10).all()
-    
+    p = ['phone', 'smartphone', 'android', 'ios', 'screen protector', 'sim', 'charger', 'battery','mobile']
+    l = ['laptop', 'notebook', 'macbook', 'macbook pro', 'macbook air', 'macbook pro 2021', 'macbook pro 2022', 'macbook pro 2023', 'macbook pro 2024','dell','hp','sony','vaio','chrome book']
     # Split into two groups for demonstration (phone and laptop reviews)
-    reviews_phone = [r for r in reviews if 'phone' in r.text.lower()]
-    reviews_laptop = [r for r in reviews if 'laptop' in r.text.lower()]
+    reviews_phone = [r for r in reviews if any(keyword in r.text.lower() for keyword in p)]
+    reviews_laptop = [r for r in reviews if any(keyword in r.text.lower() for keyword in l)]    
     
     return render_template('products.html',
                          reviews_phone=reviews_phone,
@@ -301,30 +302,56 @@ def revoke_admin():
 def admin_dashboard():
     if current_user.role not in ['admin', 'superadmin']:
         abort(403)
-    
-    # Get all reviews with sentiment analysis
     reviews = Review.query.filter(Review.sentiment.isnot(None)).all()
     
-    # Prepare data for visualizations
-    sentiment_counts = defaultdict(int)
+    # Categorize reviews
+    categories = {
+        'all': reviews,
+        'mobile': [],
+        'laptop': [],
+        'general': []
+    }
+
+    mobile_keywords = {'mobile', 'phone', 'android', 'ios', 'screen protector', 'sim'}
+    laptop_keywords = {'laptop', 'notebook', 'macbook', 'keyboard', 'trackpad', 'charger'}
+
     for review in reviews:
-        sentiment_counts[review.sentiment] += 1
-    
-    # Word frequency analysis
-    words = []
-    for review in reviews:
-        if review.text:
-            words.extend(re.findall(r'\b\w+\b', review.text.lower()))
-    word_freq = dict(Counter(words).most_common(10))
-    
+        text = review.text.lower()
+        
+        # Check for mobile keywords first
+        if any(keyword in text for keyword in mobile_keywords):
+            categories['mobile'].append(review)
+        elif any(keyword in text for keyword in laptop_keywords):
+            categories['laptop'].append(review)
+        else:
+            categories['general'].append(review)
+
+    # Prepare visualization data
+    sentiment_data = {}
+    word_freq = {}
+    for category, cat_reviews in categories.items():
+        # Sentiment analysis
+        sentiment_counts = defaultdict(int)
+        for review in cat_reviews:
+            sentiment_counts[review.sentiment] += 1
+        sentiment_data[category] = dict(sentiment_counts)
+        print(sentiment_data)
+        
+        # Word frequency
+        words = []
+        for review in cat_reviews:
+            if review.text:
+                words.extend(re.findall(r'\b\w+\b', review.text.lower()))
+        word_freq[category] = dict(Counter(words).most_common(10))    
+    print(word_freq)   
     # For superadmin only
     admins = []
     if current_user.role == 'superadmin':
         admins = User.query.filter(User.role.in_(['admin', 'superadmin'])).all()
     
     return render_template(
-        'admin_dashboard.html',
-        sentiment_data=dict(sentiment_counts),
-        word_freq=word_freq,
-        admins=admins
-    )
+    'admin_dashboard.html',
+    sentiment_data=sentiment_data,  
+    word_freq=word_freq,
+    admins=admins
+)
