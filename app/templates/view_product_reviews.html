@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ product.name }} Reviews</h2>
+    
+    <ul class="nav nav-tabs" id="productTabs">
+        <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#reviews">Reviews</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#analytics">Analytics</a>
+        </li>
+    </ul>
+    
+    <div class="tab-content mt-3">
+        <!-- Reviews Tab -->
+        <div class="tab-pane fade show active" id="reviews">
+            <div class="card shadow">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <!-- Remove the rating column and update the table structure -->
+<table class="table table-hover">
+    <thead>
+        <tr>
+            <th>Review</th>
+            <th>Sentiment</th>
+            <th>AI Reply</th>
+            <th>Date</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for review in product.reviews %}
+        <tr>
+            <td>{{ review.text }}</td>
+            <td>
+                <span class="badge bg-{{ 'success' if review.sentiment == 'positive' else 'danger' if review.sentiment == 'negative' else 'warning' }}">
+                    {{ review.sentiment or 'Pending' }}
+                </span>
+            </td>
+            <td>{{ review.reply or 'Not generated' }}</td>
+            <td>{{ review.date_posted.strftime('%Y-%m-%d') if review.date_posted else 'N/A' }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Analytics Tab -->
+        <div class="tab-pane fade" id="analytics">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            <canvas id="sentimentPieChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            <canvas id="sentimentBarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card shadow">
+                        <div class="card-body">
+                            <canvas id="ratingDistributionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Sentiment Pie Chart
+    const pieCtx = document.getElementById('sentimentPieChart').getContext('2d');
+    new Chart(pieCtx, {
+        type: 'pie',
+        data: {
+            labels: Object.keys({{ sentiment_data|tojson|safe }}),
+            datasets: [{
+                data: Object.values({{ sentiment_data|tojson|safe }}),
+                backgroundColor: ['#4CAF50', '#FFC107', '#F44336'],
+            }]
+        },
+        options: {
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Sentiment Distribution ({{ product.name }})'
+                }
+            }
+        }
+    });
+
+    // Sentiment Bar Chart
+    const barCtx = document.getElementById('sentimentBarChart').getContext('2d');
+    new Chart(barCtx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys({{ sentiment_data|tojson|safe }}),
+            datasets: [{
+                label: 'Number of Reviews',
+                data: Object.values({{ sentiment_data|tojson|safe }}),
+                backgroundColor: ['#4CAF50', '#FFC107', '#F44336'],
+            }]
+        },
+        options: {
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Sentiment Analysis ({{ product.name }})'
+                }
+            },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+    // Rating Distribution Chart (example)
+    const ratingData = {
+        // You would need to calculate this in your route
+        1: 5,
+        2: 3,
+        3: 7,
+        4: 12,
+        5: 25
+    };
+    
+    const ratingCtx = document.getElementById('ratingDistributionChart').getContext('2d');
+    new Chart(ratingCtx, {
+        type: 'polarArea',
+        data: {
+            labels: ['1 Star', '2 Stars', '3 Stars', '4 Stars', '5 Stars'],
+            datasets: [{
+                data: Object.values(ratingData),
+                backgroundColor: [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'
+                ],
+            }]
+        },
+        options: {
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Rating Distribution'
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

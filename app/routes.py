@@ -1,7 +1,7 @@
 from flask import Blueprint, abort, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from app import db, login_manager
-from app.models import User, Review
+from app.models import User, Review, Product,  ProductReview
 from app.utils import create_pie_chart, generate_ai_reply  # Ensure this import is correct
 import joblib
 import pandas as pd
@@ -12,6 +12,8 @@ import threading
 from collections import defaultdict, Counter
 import re
 import app 
+import requests
+from datetime import datetime
 
 # Load model and vectorizer
 model = joblib.load('voting_clf.pkl')
@@ -355,3 +357,188 @@ def admin_dashboard():
     word_freq=word_freq,
     admins=admins
 )
+
+import re
+
+def extract_product_id(url):
+    """
+    Extracts product ID from any Walmart product or reviews URL
+    Handles these formats:
+    - https://www.walmart.com/ip/PRODUCT-NAME/320040053
+    - https://www.walmart.com/ip/320040053
+    - https://www.walmart.com/reviews/product/320040053
+    - https://www.walmart.com/reviews/product/320040053?entryPoint=viewAllReviewsBottom
+    """
+    patterns = [
+        r'/ip/(?:[^/]+/)?(\d+)',  # /ip/.../PRODUCT_ID or /ip/PRODUCT_ID
+        r'/reviews/product/(\d+)'   # /reviews/product/PRODUCT_ID
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+def build_reviews_url(product_id):
+    """Build the reviews URL from product ID"""
+    return f"https://www.walmart.com/reviews/product/{product_id}?entryPoint=viewAllReviewsBottom"
+
+def fetch_walmart_reviews(original_url):
+    """Fetch reviews from Walmart using ZenRows API"""
+    try:
+        product_id = extract_product_id(original_url)
+        if not product_id:
+            return None, []
+            
+        # Build the proper reviews URL regardless of input URL format
+        reviews_url = build_reviews_url(product_id)
+        
+        apikey = 'fee2190f6b50c867678a5ab9f37d9b4ab194259b'
+        params = {
+            'apikey': apikey,
+            'url': reviews_url,
+        }
+        
+        response = requests.get(
+            'https://ecommerce.api.zenrows.com/v1/targets/walmart/reviews/',
+            params=params,
+            timeout=30
+        )
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        # Get product name from either the product_details or the original URL
+        product_name = data.get('product_details', {}).get('product_name')
+        if not product_name:
+            # Fallback: Extract from original URL if available
+            if '/ip/' in original_url:
+                product_name = original_url.split('/ip/')[1].split('/')[0].replace('-', ' ').title()
+        
+        return product_name or f"Product {product_id}", data.get('product_reviews_list', [])
+        
+    except Exception as e:
+        print(f"Error fetching reviews: {str(e)}")
+        return None, []
+
+def parse_walmart_date(date_str):
+    """Convert Walmart date string (like 'Jun 27, 2024') to datetime object"""
+    if not date_str:
+        return None
+    try:
+        return datetime.strptime(date_str, '%b %d, %Y')
+    except ValueError:
+        return None
+
+def process_reviews_in_batches(reviews, product_id, batch_size=20):
+    """Process reviews in batches to avoid timeouts"""
+    for i in range(0, len(reviews), batch_size):
+        batch = reviews[i:i + batch_size]
+        for review_data in batch:
+            try:
+                review_text = review_data.get('review_content', '')[:500]
+                sentiment = analyze_sentiment(review_text)
+                reply = generate_ai_reply(review_text)
+                
+                review = ProductReview(
+                    text=review_text,
+                    sentiment=sentiment,
+                    reply=reply,
+                    rating=int(review_data['average_rating_score']) if review_data.get('average_rating_score') else None,
+                    reviewer=review_data.get('reviewer_name', '')[:100],
+                    date_posted=parse_walmart_date(review_data.get('review_date')),
+                    product_id=product_id
+                )
+                db.session.add(review)
+            except Exception as e:
+                print(f"Error processing review: {e}")
+                continue
+        
+        db.session.commit()
+
+@main.route('/product-reviews', methods=['GET', 'POST'])
+@login_required
+def product_reviews():
+    if request.method == 'POST':
+        original_url = request.form.get('product_url').strip()
+        
+        # Extract product ID from any valid Walmart URL format
+        product_id = extract_product_id(original_url)
+        if not product_id:
+            flash('Invalid Walmart product URL. Please use a product page or reviews page URL.', 'danger')
+            return redirect(url_for('main.product_reviews'))
+        
+        try:
+            # Check if product exists or create new one
+            product = Product.query.filter_by(product_id=product_id).first()
+            if not product:
+                # Fetch product details and reviews
+                product_name, reviews = fetch_walmart_reviews(original_url)
+                if not product_name or not reviews:
+                    flash('No reviews found for this product', 'warning')
+                    return redirect(url_for('main.product_reviews'))
+                
+                # Create new product with the original URL
+                product = Product(
+                    product_id=product_id,
+                    name=product_name[:200],
+                    url=original_url[:500]  # Store the original URL
+                )
+                db.session.add(product)
+                db.session.flush()
+                
+                # Process reviews with sentiment analysis
+                for review_data in reviews:
+                    try:
+                        review_text = review_data.get('review_content', '')[:500]
+                        sentiment = analyze_sentiment(review_text)
+                        reply = generate_ai_reply(review_text)
+                        
+                        review = ProductReview(
+                            text=review_text,
+                            sentiment=sentiment,
+                            reply=reply,
+                            rating=int(review_data.get('rating_score', 0)) if review_data.get('rating_score') else None,
+                            reviewer=review_data.get('reviewer_name', '')[:100],
+                            date_posted=parse_walmart_date(review_data.get('review_date')),
+                            product_id=product.id,
+                        )
+                        db.session.add(review)
+                    except Exception as e:
+                        print(f"Error processing review: {e}")
+                        continue
+                
+                db.session.commit()
+                flash(f'Successfully imported {len(reviews)} reviews for {product_name}!', 'success')
+            else:
+                flash('This product already exists in database', 'info')
+            
+            return redirect(url_for('main.view_product_reviews', product_id=product.id))
+        
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error: {str(e)}")
+            flash('Error processing product reviews', 'danger')
+            return redirect(url_for('main.product_reviews'))
+    
+    return render_template('product_reviews.html') 
+
+@main.route('/product-reviews/<int:product_id>')
+@login_required
+def view_product_reviews(product_id):
+    product = Product.query.get_or_404(product_id)
+    
+    # Calculate sentiment distribution
+    sentiment_counts = defaultdict(int)
+    for review in product.reviews:
+        if review.sentiment:
+            sentiment_counts[review.sentiment] += 1
+    
+    # Prepare data for visualization
+    sentiment_data = dict(sentiment_counts)
+    
+    return render_template(
+        'view_product_reviews.html',
+        product=product,
+        sentiment_data=sentiment_data
+    )
