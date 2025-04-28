@@ -17,7 +17,12 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///sentiment.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY') or 'AIzaSyB5jOLyHnopCcpiubNnefqpPs77TMe5lkY'
+    # Add these configurations
+    UPLOAD_FOLDER = 'app/static/uploads/products'
+    ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
+    # Ensure the upload folder exists
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)

@@ -4,6 +4,7 @@ from datetime import datetime
 from . import db
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash,check_password_hash
+from  flask import url_for
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -63,10 +64,16 @@ class EcomProduct(db.Model):
     name = db.Column(db.String(200), nullable=False)
     price = db.Column(db.Float, nullable=False)
     description = db.Column(db.Text, nullable=True)
-    image_url = db.Column(db.String(500), nullable=True)
-    category = db.Column(db.String(50), nullable=False)  # e.g., 'Electronics', 'Clothing'
+    image_filename = db.Column(db.String(255), nullable=True)  # Store filename instead of URL
+    category = db.Column(db.String(50), nullable=False)
     date_added = db.Column(db.DateTime, default=datetime.utcnow)
     reviews = db.relationship('EcomProductReview', backref='product', lazy=True)
+
+    @property
+    def image_url(self):
+        if self.image_filename:
+            return url_for('static', filename=f'uploads/products/{self.image_filename}')
+        return url_for('static', filename='images/placeholder-product.png')
 
 class EcomProductReview(db.Model):
     id = db.Column(db.Integer, primary_key=True)

@@ -1,170 +1,194 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="container">
-    <h1 class="text-center mb-4">Admin Dashboard</h1>
-    <div class="container">
-        <!-- Super Admin Controls -->
-        {% if current_user.role == 'superadmin' %}
-        <div class="card shadow mb-4">
-            <div class="card-header bg-danger text-white">
-                <h3><i class="bi bi-shield-lock"></i> Super Admin Panel</h3>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <a href="{{ url_for('main.create_admin') }}" class="btn btn-success w-100">
-                            <i class="bi bi-person-plus"></i> Create Admin
-                        </a>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <button class="btn btn-info w-100" data-bs-toggle="modal" data-bs-target="#adminListModal">
-                            <i class="bi bi-people-fill"></i> Manage Admins
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
+    <h1 class="text-center mb-4">Analytics Dashboard</h1>
     
-<!-- admin_dashboard.html -->
-<!-- Add this after Super Admin Controls -->
-<ul class="nav nav-tabs mb-3" id="productTabs">
-    <li class="nav-item">
-        <a class="nav-link active" data-bs-toggle="tab" href="#all">All Products</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" data-bs-toggle="tab" href="#mobile">Mobile</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" data-bs-toggle="tab" href="#laptop">Laptop</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" data-bs-toggle="tab" href="#general">General</a>
-    </li>
-</ul>
+    <!-- Super Admin Controls -->
+    {% if current_user.role == 'superadmin' %}
+    <div class="card shadow mb-4">
+        <div class="card-header bg-danger text-white">
+            <h3><i class="bi bi-shield-lock"></i> Super Admin Panel</h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <a href="{{ url_for('main.create_admin') }}" class="btn btn-success w-100">
+                        <i class="bi bi-person-plus"></i> Create Admin
+                    </a>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <button class="btn btn-info w-100" data-bs-toggle="modal" data-bs-target="#adminListModal">
+                        <i class="bi bi-people-fill"></i> Manage Admins
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
-<div class="tab-content">
-    {% for category in ['all', 'mobile', 'laptop', 'general'] %}
-    <div class="tab-pane {% if category == 'all' %}active{% endif %}" id="{{ category }}">
-        <div class="row">
-            <div class="col-md-6">
-                <div class="card shadow">
-                    <div class="card-body">
-                        <canvas id="pieChart-{{ category }}"></canvas>
+    <!-- Filter Controls -->
+    <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white">
+            <h3><i class="bi bi-funnel"></i> Filters</h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <label class="form-label">Time Period</label>
+                    <select class="form-select" id="timeFilter">
+                        <option value="all">All Time</option>
+                        {% for month in timeline_data.keys()|sort %}
+                        <option value="{{ month }}">{{ month }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Category</label>
+                    <select class="form-select" id="categoryFilter">
+                        <option value="all">All Categories</option>
+                        {% for category in category_data.keys() %}
+                        <option value="{{ category }}">{{ category }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Product</label>
+                    <select class="form-select" id="productFilter">
+                        <option value="all">All Products</option>
+                        {% for product in product_data.keys() %}
+                        <option value="{{ product }}">{{ product }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Sentiment</label>
+                    <select class="form-select" id="sentimentFilter">
+                        <option value="all">All Sentiments</option>
+                        <option value="positive">Positive</option>
+                        <option value="negative">Negative</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Tabs -->
+    <ul class="nav nav-tabs mb-3" id="dashboardTabs">
+        <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#overview">Overview</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#category">By Category</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#product">By Product</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#timeline">Timeline</a>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+        <!-- Overview Tab -->
+        <div class="tab-pane fade show active" id="overview">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card shadow mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h4>Sentiment Distribution</h4>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="sentimentPieChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card shadow mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h4>Rating Distribution</h4>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="ratingBarChart"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="card shadow">
-                    <div class="card-body">
-                        <canvas id="barChart-{{ category }}"></canvas>
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card shadow">
+                        <div class="card-header bg-info text-white">
+                            <h4>Word Cloud - All Reviews</h4>
+                        </div>
+                        <div class="card-body">
+                            <div id="wordCloud"></div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="row mt-4">
-            <div class="col-md-12">
-                <div class="card shadow">
-                    <div class="card-body">
-                        <div id="wordcloud-{{ category }}"></div>
+
+        <!-- Category Tab -->
+        <div class="tab-pane fade" id="category">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card shadow mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h4>Reviews by Category</h4>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="categoryBarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card shadow mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h4>Sentiment by Category</h4>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="categoryStackedChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Product Tab -->
+        <div class="tab-pane fade" id="product">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card shadow mb-4">
+                        <div class="card-header bg-warning text-dark">
+                            <h4>Top Products by Reviews</h4>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="productHorizontalChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeline Tab -->
+        <div class="tab-pane fade" id="timeline">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card shadow">
+                        <div class="card-header bg-danger text-white">
+                            <h4>Review Activity Over Time</h4>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="timelineChart"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    {% endfor %}
 </div>
-<!-- Chart.js Script -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<!-- D3.js for Word Cloud -->
-<script src="https://d3js.org/d3.v7.min.js"></script>
-<script>
-    const sentimentData = {{ sentiment_data | tojson | safe }};
-    const wordFreq = {{ word_freq | tojson | safe }};
 
-    // Initialize charts for each category
-    ['all', 'mobile', 'laptop', 'general'].forEach(category => {
-        const dataExists = Object.keys(sentimentData[category]).length > 0;
-        
-        // Pie Chart
-        if (dataExists) {
-            new Chart(document.getElementById(`pieChart-${category}`).getContext('2d'), {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(sentimentData[category]),
-                    datasets: [{
-                        data: Object.values(sentimentData[category]),
-                        backgroundColor: ['#4CAF50', '#FFC107', '#F44336']
-                    }]
-                },
-                options: {
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: `${category.toUpperCase()} Sentiment Distribution`
-                        }
-                    }
-                }
-            });
-        }
-
-        // Bar Chart
-        if (dataExists) {
-            new Chart(document.getElementById(`barChart-${category}`).getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(sentimentData[category]),
-                    datasets: [{
-                        label: 'Reviews Count',
-                        data: Object.values(sentimentData[category]),
-                        backgroundColor: ['#4CAF50', '#FFC107', '#F44336']
-                    }]
-                },
-                options: {
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: `${category.toUpperCase()} Sentiment Analysis`
-                        }
-                    },
-                    scales: { y: { beginAtZero: true } }
-                }
-            });
-        }
-
-        // Word Cloud
-        const words = Object.entries(wordFreq[category]).map(([text, size]) => ({text, size}));
-        if (words.length > 0) {
-            const cloud = d3.layout.cloud()
-                .size([800, 400])
-                .words(words)
-                .padding(10)
-                .rotate(() => Math.random() * 90 - 45)
-                .fontSize(d => d.size * 15)
-                .on("end", draw);
-            
-            cloud.start();
-
-            function draw(words) {
-                d3.select(`#wordcloud-${category}`)
-                    .append("svg")
-                    .attr("width", 800)
-                    .attr("height", 400)
-                    .append("g")
-                    .attr("transform", "translate(400,200)")
-                    .selectAll("text")
-                    .data(words)
-                    .enter().append("text")
-                    .style("font-size", d => `${d.size}px`)
-                    .style("fill", "#4CAF50")
-                    .attr("transform", d => `translate(${[d.x, d.y]})rotate(${d.rotate})`)
-                    .text(d => d.text);
-            }
-        }
-    });
-    
-</script>
-<!-- Admin List Modal -->
+<!-- Admin List Modal (keep your existing modal) -->
+ <!-- Admin List Modal -->
 <div class="modal fade" id="adminListModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -204,35 +228,268 @@
         </div>
     </div>
 </div>
-<script>
-    // ... (all your existing chart visualization code) ...
 
-    // Revoke Admin Action
-    document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.revoke-admin').forEach(button => {
-            button.addEventListener('click', function() {
-                const adminId = this.dataset.adminId;
-                if (confirm('Are you sure you want to revoke admin privileges for this user?')) {
-                    fetch('/revoke-admin', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ admin_id: adminId })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            location.reload();
-                        } else {
-                            alert('Error: ' + data.message);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        alert('An error occurred while revoking admin privileges');
-                    });
+<!-- ... -->
+
+<!-- JavaScript Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+
+<script>
+// Data from Flask
+const dashboardData = {
+    sentiment: {{ sentiment_data|tojson|safe }},
+    categories: {{ category_data|tojson|safe }},
+    products: {{ product_data|tojson|safe }},
+    ratings: {{ rating_data|tojson|safe }},
+    timeline: {{ timeline_data|tojson|safe }},
+    wordFreq: {{ word_freq|tojson|safe }}
+};
+
+// Helper function to filter data
+function filterData() {
+    const timeFilter = document.getElementById('timeFilter').value;
+    const categoryFilter = document.getElementById('categoryFilter').value;
+    const productFilter = document.getElementById('productFilter').value;
+    const sentimentFilter = document.getElementById('sentimentFilter').value;
+    
+    // Implement your filtering logic here
+    // This would involve filtering the dashboardData object
+    // based on the selected filters
+    
+    return filteredData;
+}
+
+// Initialize all charts
+function initCharts() {
+    // 1. Sentiment Pie Chart
+    const sentimentCtx = document.getElementById('sentimentPieChart').getContext('2d');
+    new Chart(sentimentCtx, {
+        type: 'pie',
+        data: {
+            labels: Object.keys(dashboardData.sentiment.all),
+            datasets: [{
+                data: Object.values(dashboardData.sentiment.all),
+                backgroundColor: ['#4CAF50', '#FFC107', '#F44336']
+            }]
+        },
+        options: {
+            plugins: {
+                title: { display: true, text: 'Overall Sentiment Distribution' }
+            }
+        }
+    });
+
+    // 2. Rating Bar Chart
+    const ratingCtx = document.getElementById('ratingBarChart').getContext('2d');
+    new Chart(ratingCtx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(dashboardData.ratings).sort(),
+            datasets: [{
+                label: 'Number of Reviews',
+                data: Object.values(dashboardData.ratings),
+                backgroundColor: '#2196F3'
+            }]
+        },
+        options: {
+            plugins: {
+                title: { display: true, text: 'Rating Distribution' }
+            },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+
+    // 3. Category Bar Chart
+    const categoryCtx = document.getElementById('categoryBarChart').getContext('2d');
+    new Chart(categoryCtx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(dashboardData.categories),
+            datasets: [{
+                label: 'Total Reviews',
+                data: Object.values(dashboardData.categories).map(c => c.total || 0),
+                backgroundColor: '#4CAF50'
+            }]
+        },
+        options: {
+            plugins: {
+                title: { display: true, text: 'Reviews by Category' }
+            },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+
+    // 4. Category Stacked Chart
+    const stackedCtx = document.getElementById('categoryStackedChart').getContext('2d');
+    new Chart(stackedCtx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(dashboardData.categories),
+            datasets: [
+                {
+                    label: 'Positive',
+                    data: Object.values(dashboardData.categories).map(c => c.positive || 0),
+                    backgroundColor: '#4CAF50'
+                },
+                {
+                    label: 'Negative',
+                    data: Object.values(dashboardData.categories).map(c => c.negative || 0),
+                    backgroundColor: '#F44336'
                 }
-            });
+            ]
+        },
+        options: {
+            plugins: {
+                title: { display: true, text: 'Sentiment by Category' }
+            },
+            scales: {
+                x: { stacked: true },
+                y: { stacked: true, beginAtZero: true }
+            }
+        }
+    });
+
+    // 5. Product Horizontal Chart
+    const productCtx = document.getElementById('productHorizontalChart').getContext('2d');
+    
+    // Sort products by total reviews and take top 10
+    const sortedProducts = Object.entries(dashboardData.products)
+        .sort((a, b) => (b[1].total || 0) - (a[1].total || 0))
+        .slice(0, 10);
+    
+    new Chart(productCtx, {
+        type: 'bar',
+        data: {
+            labels: sortedProducts.map(p => p[0]),
+            datasets: [{
+                label: 'Total Reviews',
+                data: sortedProducts.map(p => p[1].total || 0),
+                backgroundColor: '#FF9800'
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            plugins: {
+                title: { display: true, text: 'Top Products by Review Count' }
+            },
+            scales: { x: { beginAtZero: true } }
+        }
+    });
+
+    // 6. Timeline Chart
+    const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+    const sortedMonths = Object.keys(dashboardData.timeline).sort();
+    
+    new Chart(timelineCtx, {
+        type: 'line',
+        data: {
+            labels: sortedMonths,
+            datasets: [
+                {
+                    label: 'Total Reviews',
+                    data: sortedMonths.map(m => dashboardData.timeline[m].total || 0),
+                    borderColor: '#2196F3',
+                    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                    fill: true
+                },
+                {
+                    label: 'Positive',
+                    data: sortedMonths.map(m => dashboardData.timeline[m].positive || 0),
+                    borderColor: '#4CAF50',
+                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                    fill: true
+                },
+                {
+                    label: 'Negative',
+                    data: sortedMonths.map(m => dashboardData.timeline[m].negative || 0),
+                    borderColor: '#F44336',
+                    backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            plugins: {
+                title: { display: true, text: 'Review Activity Over Time' }
+            },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+
+    // 7. Word Cloud
+    const wordCloud = d3.select("#wordCloud")
+        .append("svg")
+        .attr("width", 800)
+        .attr("height", 400)
+        .append("g")
+        .attr("transform", "translate(400,200)");
+
+    const words = Object.entries(dashboardData.wordFreq.all).map(([text, size]) => ({text, size}));
+
+    const cloud = d3.layout.cloud()
+        .size([800, 400])
+        .words(words)
+        .padding(5)
+        .rotate(() => (Math.random() - 0.5) * 60)
+        .fontSize(d => d.size * 2)
+        .on("end", draw);
+
+    cloud.start();
+
+    function draw(words) {
+        wordCloud.selectAll("text")
+            .data(words)
+            .enter()
+            .append("text")
+            .style("font-size", d => `${d.size}px`)
+            .style("fill", "#4CAF50")
+            .attr("text-anchor", "middle")
+            .attr("transform", d => `translate(${d.x},${d.y})rotate(${d.rotate})`)
+            .text(d => d.text);
+    }
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    initCharts();
+    
+    // Add event listeners for filters
+    document.querySelectorAll('.form-select').forEach(select => {
+        select.addEventListener('change', function() {
+            // Implement your filter update logic here
+            // This would involve destroying and recreating charts
+            // with filtered data
+            console.log('Filter changed - implement your update logic');
         });
     });
+    
+    // Keep your existing admin management JS
+    document.querySelectorAll('.revoke-admin').forEach(button => {
+        button.addEventListener('click', function() {
+            const adminId = this.dataset.adminId;
+            if (confirm('Are you sure you want to revoke admin privileges for this user?')) {
+                fetch('/revoke-admin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ admin_id: adminId })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while revoking admin privileges');
+                });
+            }
+        });
+    });
+});
 </script>
 {% endblock %}

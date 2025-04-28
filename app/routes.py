@@ -1,6 +1,7 @@
 from flask import Blueprint, abort, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from app import db, login_manager
+from flask import current_app
 from app.models import User, Review, Product,  ProductReview,EcomProductReview,EcomProduct
 from app.utils import create_pie_chart, generate_ai_reply  # Ensure this import is correct
 import joblib
@@ -29,6 +30,17 @@ ALLOWED_EXTENSIONS = {'xlsx', 'xls'}
 # Ensure the upload folder exists
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+
+from functools import wraps
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.role not in ['admin', 'superadmin']:
+            flash('You do not have permission to access this page', 'danger')
+            return redirect(url_for('main.products'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -219,8 +231,8 @@ def bulk_generate_replies():
     return jsonify({'status': 'started'})
 
 
-@main.route('/products')
-def products():
+@main.route('/old-products')
+def old_products():
     # Get sample reviews for demonstration
     # In a real app, you'd want to filter by product ID or category
     reviews = Review.query.order_by(Review.id.desc()).limit(10).all()
@@ -298,66 +310,104 @@ def revoke_admin():
     db.session.commit()
     return jsonify({'success': True})
 
-# ======= UPDATED ADMIN DASHBOARD ======= #
 @main.route('/admin/dashboard')
 @login_required
 def admin_dashboard():
     if current_user.role not in ['admin', 'superadmin']:
         abort(403)
-    reviews = Review.query.filter(Review.sentiment.isnot(None)).all()
     
-    # Categorize reviews
-    categories = {
-        'all': reviews,
-        'mobile': [],
-        'laptop': [],
-        'general': []
+    # Get all data
+    all_reviews = Review.query.all()
+    product_reviews = ProductReview.query.all()
+    ecom_reviews = EcomProductReview.query.all()
+    
+    # Combine all reviews
+    combined_reviews = list(all_reviews) + list(product_reviews) + list(ecom_reviews)
+    
+    # Prepare data structures
+    data = {
+        'sentiment': defaultdict(lambda: defaultdict(int)),
+        'categories': defaultdict(lambda: defaultdict(int)),
+        'products': defaultdict(lambda: defaultdict(int)),
+        'ratings': defaultdict(int),
+        'timeline': defaultdict(lambda: defaultdict(int)),
+        'word_freq': defaultdict(lambda: defaultdict(int))
     }
-
-    mobile_keywords = {'mobile', 'phone', 'android', 'ios', 'screen protector', 'sim'}
-    laptop_keywords = {'laptop', 'notebook', 'macbook', 'keyboard', 'trackpad', 'charger'}
-
-    for review in reviews:
-        text = review.text.lower()
-        
-        # Check for mobile keywords first
-        if any(keyword in text for keyword in mobile_keywords):
-            categories['mobile'].append(review)
-        elif any(keyword in text for keyword in laptop_keywords):
-            categories['laptop'].append(review)
-        else:
-            categories['general'].append(review)
-
-    # Prepare visualization data
-    sentiment_data = {}
-    word_freq = {}
-    for category, cat_reviews in categories.items():
-        # Sentiment analysis
-        sentiment_counts = defaultdict(int)
-        for review in cat_reviews:
-            sentiment_counts[review.sentiment] += 1
-        sentiment_data[category] = dict(sentiment_counts)
-        print(sentiment_data)
-        
-        # Word frequency
-        words = []
-        for review in cat_reviews:
+    
+    # Process all reviews
+    for review in combined_reviews:
+        try:
+            # Get product info
+            product = None
+            product_category = "General"
+            if hasattr(review, 'product'):
+                product = review.product
+                if hasattr(product, 'category'):
+                    product_category = product.category
+            
+            # Sentiment analysis
+            if review.sentiment:
+                data['sentiment']['all'][review.sentiment] += 1
+                data['sentiment'][product_category][review.sentiment] += 1
+                if product:
+                    data['sentiment'][product.name][review.sentiment] += 1
+            
+            # Categories
+            data['categories'][product_category]['total'] += 1
+            if review.sentiment:
+                data['categories'][product_category][review.sentiment] += 1
+            
+            # Products
+            if product:
+                data['products'][product.name]['total'] += 1
+                if review.sentiment:
+                    data['products'][product.name][review.sentiment] += 1
+            
+            # Ratings
+            if hasattr(review, 'rating') and review.rating:
+                data['ratings'][review.rating] += 1
+            
+            # Timeline
+            if hasattr(review, 'date_added') and review.date_added:
+                month_year = review.date_added.strftime('%Y-%m')
+                data['timeline'][month_year]['total'] += 1
+                if review.sentiment:
+                    data['timeline'][month_year][review.sentiment] += 1
+            
+            # Word frequency
             if review.text:
-                words.extend(re.findall(r'\b\w+\b', review.text.lower()))
-        word_freq[category] = dict(Counter(words).most_common(10))    
-    print(word_freq)   
-    # For superadmin only
+                words = re.findall(r'\b\w{3,}\b', review.text.lower())
+                for word in words:
+                    data['word_freq']['all'][word] += 1
+                    data['word_freq'][product_category][word] += 1
+                    if product:
+                        data['word_freq'][product.name][word] += 1
+        
+        except Exception as e:
+            print(f"Error processing review {review.id}: {str(e)}")
+            continue
+    
+    # Process word frequencies (get top 20 for each category)
+    processed_word_freq = defaultdict(dict)
+    for category, words in data['word_freq'].items():
+        top_words = sorted(words.items(), key=lambda x: x[1], reverse=True)[:20]
+        processed_word_freq[category] = dict(top_words)
+    
+    # Prepare for superadmin
     admins = []
     if current_user.role == 'superadmin':
         admins = User.query.filter(User.role.in_(['admin', 'superadmin'])).all()
     
     return render_template(
-    'admin_dashboard.html',
-    sentiment_data=sentiment_data,  
-    word_freq=word_freq,
-    admins=admins
-)
-
+        'admin_dashboard.html',
+        sentiment_data=dict(data['sentiment']),
+        category_data=dict(data['categories']),
+        product_data=dict(data['products']),
+        rating_data=dict(data['ratings']),
+        timeline_data=dict(data['timeline']),
+        word_freq=dict(processed_word_freq),
+        admins=admins
+    )
 import re
 
 def extract_product_id(url):
@@ -542,40 +592,42 @@ def view_product_reviews(product_id):
         product=product,
         sentiment_data=sentiment_data
     )
+from werkzeug.utils import secure_filename
+import os
+from werkzeug.utils import secure_filename
+import os
 
-@main.route('/add-product', methods=['GET', 'POST'])
-@login_required
-def add_product():
-    if request.method == 'POST':
-        try:
-            # Create new product
-            product = EcomProduct(
-                name=request.form.get('name'),
-                price=float(request.form.get('price')),
-                description=request.form.get('description'),
-                image_url=request.form.get('image_url'),
-                category=request.form.get('category')
-            )
-            db.session.add(product)
-            db.session.commit()
-            flash('Product added successfully!', 'success')
-            return redirect(url_for('main.products'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error adding product: {str(e)}', 'danger')
-    
-    return render_template('add_product.html')
+def allowed_image_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
 
 @main.route('/products')
 def products():
+    """View all products - accessible to everyone"""
     all_products = EcomProduct.query.order_by(EcomProduct.date_added.desc()).all()
     return render_template('products.html', products=all_products)
 
-
+@main.route('/product/<int:product_id>')
+def product_detail(product_id):
+    """View product details - accessible to everyone"""
+    product = EcomProduct.query.get_or_404(product_id)
+    
+    # Calculate sentiment distribution for visualization
+    sentiment_counts = defaultdict(int)
+    for review in product.reviews:
+        if review.sentiment:
+            sentiment_counts[review.sentiment] += 1
+    
+    return render_template(
+        'product_detail.html',
+        product=product,
+        sentiment_data=dict(sentiment_counts)
+    )
 
 @main.route('/add-review/<int:product_id>', methods=['POST'])
-@login_required
+@login_required  # Only logged-in users can submit reviews
 def add_review(product_id):
+    """Submit review - accessible to all logged-in users"""
     product = EcomProduct.query.get_or_404(product_id)
     review_text = request.form.get('review_text')
     rating = int(request.form.get('rating'))
@@ -598,3 +650,37 @@ def add_review(product_id):
     
     flash('Review submitted successfully!', 'success')
     return redirect(url_for('main.product_detail', product_id=product.id))
+
+@main.route('/add-product', methods=['GET', 'POST'])
+@login_required
+@admin_required  # This decorator needs to be created (see below)
+def add_product():
+    """Add product - accessible only to admins"""
+    if request.method == 'POST':
+        try:
+            # Handle file upload
+            image_file = request.files.get('image_file')
+            filename = None
+            
+            if image_file and allowed_image_file(image_file.filename):
+                filename = secure_filename(image_file.filename)
+                image_path = os.path.join(current_app.root_path, 'static', 'uploads', 'products', filename)
+                image_file.save(image_path)
+            
+            # Create new product
+            product = EcomProduct(
+                name=request.form.get('name'),
+                price=float(request.form.get('price')),
+                description=request.form.get('description'),
+                image_filename=filename,
+                category=request.form.get('category')
+            )
+            db.session.add(product)
+            db.session.commit()
+            flash('Product added successfully!', 'success')
+            return redirect(url_for('main.products'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding product: {str(e)}', 'danger')
+    
+    return render_template('add_product.html')

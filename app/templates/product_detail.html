@@ -12,14 +12,14 @@
             <h3 class="text-success">${{ "%.2f"|format(product.price) }}</h3>
             <p>{{ product.description }}</p>
             
-            {% if current_user.is_authenticated %}
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#reviewModal">
-                Add Review
-            </button>
-            {% else %}
-            <p class="text-muted">Please <a href="{{ url_for('main.login') }}">login</a> to leave a review</p>
-            {% endif %}
-        </div>
+           <!-- Add review button section -->
+    {% if current_user.is_authenticated %}
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#reviewModal">
+            Add Review
+        </button>
+        {% else %}
+        <p class="text-muted">Please <a href="{{ url_for('main.login') }}">login</a> to leave a review</p>
+        {% endif %}
     </div>
 
     <div class="mt-5">
