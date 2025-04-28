@@ -1,7 +1,7 @@
 from flask import Blueprint, abort, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from app import db, login_manager
-from app.models import User, Review, Product,  ProductReview
+from app.models import User, Review, Product,  ProductReview,EcomProductReview,EcomProduct
 from app.utils import create_pie_chart, generate_ai_reply  # Ensure this import is correct
 import joblib
 import pandas as pd
@@ -542,3 +542,59 @@ def view_product_reviews(product_id):
         product=product,
         sentiment_data=sentiment_data
     )
+
+@main.route('/add-product', methods=['GET', 'POST'])
+@login_required
+def add_product():
+    if request.method == 'POST':
+        try:
+            # Create new product
+            product = EcomProduct(
+                name=request.form.get('name'),
+                price=float(request.form.get('price')),
+                description=request.form.get('description'),
+                image_url=request.form.get('image_url'),
+                category=request.form.get('category')
+            )
+            db.session.add(product)
+            db.session.commit()
+            flash('Product added successfully!', 'success')
+            return redirect(url_for('main.products'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding product: {str(e)}', 'danger')
+    
+    return render_template('add_product.html')
+
+@main.route('/products')
+def products():
+    all_products = EcomProduct.query.order_by(EcomProduct.date_added.desc()).all()
+    return render_template('products.html', products=all_products)
+
+
+
+@main.route('/add-review/<int:product_id>', methods=['POST'])
+@login_required
+def add_review(product_id):
+    product = EcomProduct.query.get_or_404(product_id)
+    review_text = request.form.get('review_text')
+    rating = int(request.form.get('rating'))
+    
+    # Analyze sentiment
+    sentiment = analyze_sentiment(review_text)
+    reply = generate_ai_reply(review_text)
+    
+    # Create review
+    review = EcomProductReview(
+        text=review_text,
+        sentiment=sentiment,
+        reply=reply,
+        product_id=product.id,
+        user_id=current_user.id,
+        rating=rating
+    )
+    db.session.add(review)
+    db.session.commit()
+    
+    flash('Review submitted successfully!', 'success')
+    return redirect(url_for('main.product_detail', product_id=product.id))

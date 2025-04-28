@@ -57,3 +57,25 @@ class ProductReview(db.Model):
     __table_args__ = (
         db.Index('ix_product_review_product', 'product_id'),
     )
+
+class EcomProduct(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    image_url = db.Column(db.String(500), nullable=True)
+    category = db.Column(db.String(50), nullable=False)  # e.g., 'Electronics', 'Clothing'
+    date_added = db.Column(db.DateTime, default=datetime.utcnow)
+    reviews = db.relationship('EcomProductReview', backref='product', lazy=True)
+
+class EcomProductReview(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    text = db.Column(db.String(500), nullable=False)
+    sentiment = db.Column(db.String(20), nullable=True)
+    reply = db.Column(db.String(500), nullable=True)
+    date_added = db.Column(db.DateTime, default=datetime.utcnow)
+    product_id = db.Column(db.Integer, db.ForeignKey('ecom_product.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    rating = db.Column(db.Integer, nullable=True)
+    
+    user = db.relationship('User', backref='ecom_reviews')

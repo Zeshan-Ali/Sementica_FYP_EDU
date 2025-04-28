@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-6">
+            <img src="{{ product.image_url or '/static/images/placeholder-product.png' }}" 
+                 class="img-fluid rounded" alt="{{ product.name }}">
+        </div>
+        <div class="col-md-6">
+            <h1>{{ product.name }}</h1>
+            <p class="text-muted">{{ product.category }}</p>
+            <h3 class="text-success">${{ "%.2f"|format(product.price) }}</h3>
+            <p>{{ product.description }}</p>
+            
+            {% if current_user.is_authenticated %}
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#reviewModal">
+                Add Review
+            </button>
+            {% else %}
+            <p class="text-muted">Please <a href="{{ url_for('main.login') }}">login</a> to leave a review</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="mt-5">
+        <h3>Product Reviews</h3>
+        {% if product.reviews %}
+            {% for review in product.reviews %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <h5>{{ review.user.username }}</h5>
+                        <div class="text-warning">
+                            {% for i in range(1,6) %}
+                                {% if i <= review.rating %}★{% else %}☆{% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <p>{{ review.text }}</p>
+                    <div class="alert alert-info">
+                        <strong>AI Response:</strong> {{ review.reply }}
+                    </div>
+                    <small class="text-muted">
+                        {{ review.date_added.strftime('%B %d, %Y') }}
+                        <span class="badge bg-{{ 'success' if review.sentiment == 'positive' else 'danger' if review.sentiment == 'negative' else 'warning' }}">
+                            {{ review.sentiment }}
+                        </span>
+                    </small>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p>No reviews yet. Be the first to review!</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Review Modal -->
+<div class="modal fade" id="reviewModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Review {{ product.name }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.add_review', product_id=product.id) }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Your Review</label>
+                        <textarea class="form-control" name="review_text" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Rating</label>
+                        <select class="form-select" name="rating" required>
+                            <option value="5">★★★★★ (5)</option>
+                            <option value="4">★★★★☆ (4)</option>
+                            <option value="3">★★★☆☆ (3)</option>
+                            <option value="2">★★☆☆☆ (2)</option>
+                            <option value="1">★☆☆☆☆ (1)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Submit Review</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
